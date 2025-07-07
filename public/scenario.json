@@ -1,0 +1,110 @@
+{
+  "title": "まどろみの館殺人事件",
+  "scheduleFile": "/data/schedule.txt",
+  "synopsisFile": "/data/synopsis.txt",
+  "commonInfo": {
+    "textFile": "/data/common_info.txt"
+  },
+  "intermediateInfo": {
+    "textFile": "/data/intermediate_info.txt"
+  },
+  "characters": [
+    {
+      "id": "char_01",
+      "name": "速水 響",
+      "type": "PC",
+      "profile": "28歳・男性。鋭い観察眼を持つ私立探偵。",
+      "storyFile": "/data/char_01_story.txt",
+      "mapImageFile": "/images/map_common.png",
+      "goals": [
+        { "text": "事件の犯人を見つけ出す。", "points": 30 },
+        { "text": "自分の過去の秘密を守り通す。", "points": 10 }
+      ]
+    },
+    {
+      "id": "char_02",
+      "name": "一条 麗奈",
+      "type": "PC",
+      "profile": "22歳・女性。資産家の令嬢で、被害者の婚約者。",
+      "storyFile": "/data/char_02_story.txt",
+      "mapImageFile": "/images/map_common.png",
+      "goals": [
+        { "text": "自分が犯人だと疑われない。", "points": 20 },
+        { "text": "被害者との間にあった隠し事を誰にも知られない。", "points": 20 }
+      ]
+    },
+    {
+      "id": "char_03",
+      "name": "神崎 譲二",
+      "type": "PC",
+      "profile": "45歳・男性。被害者のビジネスパートナー。",
+      "storyFile": "./data/char_03_story.txt",
+      "mapImageFile": "./images/map_common.png",
+      "goals": [
+        { "text": "事件の犯人を見つけ出す。", "points": 20 },
+        { "text": "被害者と共謀して公金横領をしていた事実を隠し通す", "points": 30 }
+      ]
+    },
+    {
+      "id": "npc_victim",
+      "name": "西園寺 剛",
+      "type": "NPC",
+      "profile": "55歳・男性。この洋館の主。自室で殺害された。"
+    }
+  ],
+  "endings": [
+    {
+      "votedCharId": "char_01",
+      "endingFile": "/data/ending_char01.txt",
+      "title": "エンディング：速水 響"
+    },
+    {
+      "votedCharId": "char_02",
+      "endingFile": "/data/ending_char02.txt",
+      "title": "エンディング：一条 麗奈"
+    },
+    {
+      "votedCharId": "char_03",
+      "endingFile": "/data/ending_char03.txt",
+      "title": "エンディング：神崎 譲二"
+    },
+    {
+      "votedCharId": "npc_victim",
+      "endingFile": "/data/ending_victim.txt",
+      "title": "エンディング：西園寺 剛"
+    },
+    {
+      "votedCharId": "default",
+      "endingFile": "/data/ending_default_bad.txt",
+      "title": "エンディング：真相にはたどり着けなかった"
+    }
+  ],
+  "debriefing": {
+    "characterEndings": [
+      {
+        "id": "reveal_char_01",
+        "title": "速水 響 END",
+        "file": "/data/ending_char01.txt"
+      },
+      {
+        "id": "reveal_char_02",
+        "title": "一条 麗奈 END",
+        "file": "/data/ending_char02.txt"
+      },
+    {
+      "votedCharId": "char_03",
+      "endingFile": "/data/ending_char03.txt",
+      "title": "神崎 譲二 END"
+    },
+      {
+        "id": "reveal_victim",
+        "title": "西園寺 剛 END",
+        "file": "/data/ending_victim.txt"
+      }
+    ],
+    "mainCommentary": {
+      "title": "解説",
+      "file": "/data/debriefing_main.txt"
+    }
+  }
+}

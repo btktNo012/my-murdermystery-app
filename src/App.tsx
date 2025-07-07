@@ -1,35 +1,221 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// src\App.tsx
+import { useState, useEffect } from 'react';
+// 各画面コンポーネントをインポート
+import AttentionScreen from './screens/AttentionScreen';
+import StartScreen from './screens/StartScreen';
+import InfoDisplayScreen from './screens/InfoDisplayScreen';
+import CharacterSelectScreen from './screens/CharacterSelectScreen';
+import IndividualStoryScreen from './screens/IndividualStoryScreen';
+import DiscussionScreen from './screens/DiscussionScreen';
+import VotingScreen from './screens/VotingScreen';
+import EndingScreen from './screens/EndingScreen';
+import DebriefingScreen from './screens/DebriefingScreen';
+import { type ScenarioData } from './types';
+import { type TabItem } from './components/Tabs';
+import TextRenderer from './components/TextRenderer';
+import './style.css';
 
+type GamePhase = 'attention' | 'start' | 'schedule'| 'synopsis' | 'characterSelect' | 'commonInfo' | 'individualStory' | 'firstDiscussion' | 'interlude' | 'secondDiscussion' | 'voting' | 'ending' | 'debriefing'
 function App() {
-  const [count, setCount] = useState(0)
+  // useStateを使って、gamePhaseの状態を管理する
+  // 初期画面を 'attention' (注意書き画面) に設定
+  const [gamePhase, setGamePhase] = useState<GamePhase>('attention');
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
+  const [votedCharacterId, setVotedCharacterId] = useState<string | null>(null);
+  const [scenario, setScenario] = useState<ScenarioData | null>(null);
+
+  // アプリケーション起動時にシナリオデータを読み込む
+  useEffect(() => {
+    fetch('/scenario.json')
+      .then(response => response.json())
+      .then(data => setScenario(data))
+      .catch(error => console.error("シナリオの読み込みに失敗:", error));
+  }, []); // 空の配列を渡して、初回レンダリング時に一度だけ実行
+
+  // キャラクターが選択されたときのハンドラ
+  const handleCharacterSelect = (characterId: string) => {
+    setSelectedCharacterId(characterId);
+    setGamePhase('commonInfo'); // 次の画面へ
+  };
+  // 投票が完了したときのハンドラ
+  const handleVoteComplete = (votedId: string) => {
+    setVotedCharacterId(votedId);
+    setGamePhase('ending'); // エンディング画面へ
+  };
+  // gamePhaseの値に応じて表示するコンポーネントを切り替える
+  const renderScreen = () => {
+    // --- Guard 1: シナリオデータの読み込みチェック ---
+    // attention画面以外ではシナリオデータが必須。
+    // まだ読み込めていない（nullの）場合は、ローディング表示を返す。
+    if (gamePhase !== 'attention' && !scenario) {
+      return <div>シナリオを読み込んでいます...</div>;
+    }
+
+    // --- Guard 2: キャラクター選択のチェック ---
+    // individualStory以降のフェーズで、キャラクターが未選択（null）の場合は
+    // エラーメッセージを表示するか、選択画面にリダイレクトする。
+    const characterDependentPhases: GamePhase[] = [
+      'individualStory',
+      'firstDiscussion',
+      'secondDiscussion',
+      'voting',
+      'ending',
+      'debriefing'
+    ];
+    if (characterDependentPhases.includes(gamePhase) && !selectedCharacterId) {
+      // ここでエラーを出すか、選択画面に戻すか選べる
+      // setGamePhase('characterSelect'); // 強制的に戻す場合
+      return <div>キャラクターが選択されていません。ページをリロードした場合は、最初からやり直してください。</div>;
+    }
+    const selectedChar = scenario?.characters.find(char => char.id === selectedCharacterId);
+    switch (gamePhase) {
+      case 'attention':
+        // onNextプロパティとして、gamePhaseを次に進める関数を渡す
+        return <AttentionScreen onNext={() => setGamePhase('start')} />;
+      case 'start':
+        return <StartScreen title={scenario!.title} onNext={() => setGamePhase('schedule')} />;
+      case 'schedule':
+        return <InfoDisplayScreen title="進行スケジュール" filePath={scenario!.scheduleFile} onNext={() => setGamePhase('synopsis')} />;
+      case 'synopsis':
+        return <InfoDisplayScreen title="あらすじ" filePath={scenario!.synopsisFile} onNext={() => setGamePhase('characterSelect')} />;
+      case 'characterSelect':
+        return (
+          <CharacterSelectScreen
+            characters={scenario!.characters}
+            onCharacterSelect={handleCharacterSelect}
+          />
+        );
+      case 'commonInfo':
+        return <InfoDisplayScreen title="共通情報" filePath={scenario!.commonInfo.textFile} onNext={() => setGamePhase('individualStory')} />;
+      case 'individualStory': { // 波括弧でスコープを作成
+        // 選択されたキャラクターIDがなければ、エラー表示または初期画面に戻す
+        if (!selectedCharacterId) {
+          return <div>キャラクターが選択されていません。最初からやり直してください。</div>;
+        }
+
+        // 選択されたキャラクターのオブジェクトを探す
+        const selectedChar = scenario!.characters.find(
+          char => char.id === selectedCharacterId
+        );
+
+        // キャラクターが見つからなかった場合のガード
+        if (!selectedChar) {
+          return <div>選択されたキャラクター情報が見つかりません。</div>;
+        }
+
+        return (
+          <IndividualStoryScreen
+            character={selectedChar!} // ! は「null/undefinedではない」とTSに断言する。ガードがあるので安全。
+            onBack={() => setGamePhase('commonInfo')}
+            onNext={() => setGamePhase('firstDiscussion')}
+          />
+        );
+      }
+      case 'firstDiscussion': {
+        const tabItems: TabItem[] = [
+          {
+            label: '共通情報',
+            content: <TextRenderer filePath={scenario!.commonInfo.textFile} />
+          },
+          {
+            label: '個別ストーリー',
+            content: selectedChar!.storyFile ? <TextRenderer filePath={selectedChar!.storyFile} /> : <div />
+          }
+        ];
+        return (
+          <DiscussionScreen
+            title="第一議論フェイズ"
+            character={selectedChar!}
+            tabItems={tabItems}
+            discussionTime={600} // 例: 10分
+            onNext={() => setGamePhase('interlude')}
+          />
+        );
+      }
+      case 'interlude':
+        return (
+          <InfoDisplayScreen
+            title="中間情報"
+            filePath={scenario!.intermediateInfo.textFile}
+            onNext={() => setGamePhase('secondDiscussion')} // 次は第二議論
+          />
+        );
+      case 'secondDiscussion': {
+        const tabItems: TabItem[] = [
+          {
+            label: '共通情報',
+            content: <TextRenderer filePath={scenario!.commonInfo.textFile} />
+          },
+          {
+            label: '個別ストーリー',
+            content: selectedChar!.storyFile ? <TextRenderer filePath={selectedChar!.storyFile} /> : <div />
+          },
+          {
+            label: '中間情報',
+            content: <TextRenderer filePath={scenario!.intermediateInfo.textFile} />
+          }
+        ];
+        return (
+          <DiscussionScreen
+            title="第二議論フェイズ"
+            character={selectedChar!}
+            tabItems={tabItems}
+            discussionTime={600} // 例: 10分
+            onNext={() => setGamePhase('voting')}
+          />
+        );
+      }
+      case 'voting':
+        return (
+          <VotingScreen
+            characters={scenario!.characters}
+            onVoteComplete={handleVoteComplete}
+          />
+        );
+      case 'ending': {
+        // 投票結果IDがなければエラー
+        if (!votedCharacterId) {
+          return <div>投票結果がありません。</div>;
+        }
+
+        // 投票結果IDに一致するエンディングを探す
+        let targetEnding = scenario!.endings.find(
+          end => end.votedCharId === votedCharacterId
+        );
+
+        // もし一致するエンディングがなければ、defaultエンディングを探す
+        if (!targetEnding) {
+          targetEnding = scenario!.endings.find(
+            end => end.votedCharId === 'default'
+          );
+        }
+
+        // それでもエンディングが見つからなければエラー
+        if (!targetEnding) {
+          return <div>対応するエンディングが見つかりません。</div>
+        }
+
+        return (
+          <EndingScreen
+            ending={targetEnding}
+            onNext={() => setGamePhase('debriefing')} // 次は感想戦画面
+          />
+        );
+      }
+      case 'debriefing':
+        return <DebriefingScreen scenario={scenario!} />;
+      default:
+        // 想定外のgamePhaseになった場合のフォールバック
+        return <AttentionScreen onNext={() => setGamePhase('start')} />;
+    }
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className="App">
+      {/* 上記の関数を呼び出して、適切な画面を描画する */}
+      {renderScreen()}
+    </div>
+  );
 }
 
-export default App
+export default App;
