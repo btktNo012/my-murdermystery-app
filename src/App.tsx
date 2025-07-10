@@ -13,16 +13,30 @@ import DebriefingScreen from './screens/DebriefingScreen';
 import { type ScenarioData } from './types';
 import { type TabItem } from './components/Tabs';
 import TextRenderer from './components/TextRenderer';
+import Timer from './components/Timer';
+import Modal from './components/Modal';
 import './style.css';
 
-type GamePhase = 'attention' | 'start' | 'schedule'| 'synopsis' | 'characterSelect' | 'commonInfo' | 'individualStory' | 'firstDiscussion' | 'interlude' | 'secondDiscussion' | 'voting' | 'ending' | 'debriefing'
+type GamePhase = 'attention' | 'start' | 'schedule' | 'synopsis' | 'characterSelect' | 'commonInfo' | 'individualStory' | 'firstDiscussion' | 'interlude' | 'secondDiscussion' | 'voting' | 'ending' | 'debriefing'
 function App() {
+  // HO読み込み時間（10分）
+  const READING_TIME_SECONDS = 600;
+  // HO読み込み延長時間（3分）
+  const READING_TIME_SECONDS_EXTENSION = 180;
+  // 第一議論フェイズ時間（10分）
+  const FIRST_DISCUSSION_SECONDS = 600;
+  // 第二議論フェイズ時間（10分）
+  const SECOND_DISCUSSION_SECONDS = 600;
   // useStateを使って、gamePhaseの状態を管理する
   // 初期画面を 'attention' (注意書き画面) に設定
   const [gamePhase, setGamePhase] = useState<GamePhase>('attention');
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [votedCharacterId, setVotedCharacterId] = useState<string | null>(null);
   const [scenario, setScenario] = useState<ScenarioData | null>(null);
+  const [readingTime, setReadingTime] = useState(READING_TIME_SECONDS);
+  const [isReadingTimerTicking, setIsReadingTimerTicking] = useState(false);
+  // HO読み込み時間終了モーダル表示フラグ
+  const [isHoReadEndModalFlg, setIsHoReadEndModalFlg] = useState(false);
 
   // アプリケーション起動時にシナリオデータを読み込む
   useEffect(() => {
@@ -42,6 +56,48 @@ function App() {
     setVotedCharacterId(votedId);
     setGamePhase('ending'); // エンディング画面へ
   };
+
+  /**
+   * 共通情報・個別ストーリー画面用タイマーロジック
+   */
+  // [タイマーロジック1] isReadingTimerTickingがtrueになったら1秒ごとに時間を減らす
+  useEffect(() => {
+    if (!isReadingTimerTicking || readingTime <= 0) {
+      return;
+    }
+    const timerId = setInterval(() => {
+      setReadingTime(prevTime => prevTime - 1);
+    }, 1000);
+    return () => clearInterval(timerId);
+  }, [isReadingTimerTicking, readingTime]);
+
+  // [タイマーロジック2] gamePhaseの変更を監視してタイマーを開始/停止する
+  useEffect(() => {
+    // commonInfo画面になったらタイマーを開始
+    if (gamePhase === 'commonInfo') {
+      setIsReadingTimerTicking(true);
+    }
+    // 議論フェーズに入ったらタイマーを停止・リセット
+    else if (gamePhase === 'firstDiscussion') {
+      setIsReadingTimerTicking(false);
+      setReadingTime(READING_TIME_SECONDS); // 次回のためにリセット
+    }
+  }, [gamePhase]);
+
+  // [タイマーロジック3] 時間がゼロになったら読み込み時間を延長するか質問するモーダルをオープン
+  useEffect(() => {
+    if (readingTime === 0) {
+      setIsReadingTimerTicking(false);
+      setIsHoReadEndModalFlg(true);
+    }
+  }, [readingTime]);
+
+  // Timerコンポーネントを使い回すために、ダミーのonTimeUp関数(何もしない)を用意
+  const dummyOnTimeUp = () => { };
+
+  // 画面間共通タイマーを表示する画面（共通情報・個別ストーリー）かどうか判定
+  const shouldShowReadingTimer = gamePhase === 'commonInfo' || gamePhase === 'individualStory';
+
   // gamePhaseの値に応じて表示するコンポーネントを切り替える
   const renderScreen = () => {
     // --- Guard 1: シナリオデータの読み込みチェック ---
@@ -67,6 +123,8 @@ function App() {
       // setGamePhase('characterSelect'); // 強制的に戻す場合
       return <div>キャラクターが選択されていません。ページをリロードした場合は、最初からやり直してください。</div>;
     }
+
+    // 選択キャラクター情報
     const selectedChar = scenario?.characters.find(char => char.id === selectedCharacterId);
     switch (gamePhase) {
       case 'attention':
@@ -75,18 +133,19 @@ function App() {
       case 'start':
         return <StartScreen title={scenario!.title} onNext={() => setGamePhase('schedule')} />;
       case 'schedule':
-        return <InfoDisplayScreen title="進行スケジュール" filePath={scenario!.scheduleFile} onNext={() => setGamePhase('synopsis')} />;
+        return <InfoDisplayScreen title="進行スケジュール" filePath={scenario!.scheduleFile} onBackFlg={false} onBack={() => { }} onNext={() => setGamePhase('synopsis')} />;
       case 'synopsis':
-        return <InfoDisplayScreen title="あらすじ" filePath={scenario!.synopsisFile} onNext={() => setGamePhase('characterSelect')} />;
+        return <InfoDisplayScreen title="あらすじ" filePath={scenario!.synopsisFile} onBackFlg={true} onBack={() => setGamePhase('schedule')} onNext={() => setGamePhase('characterSelect')} />;
       case 'characterSelect':
         return (
           <CharacterSelectScreen
             characters={scenario!.characters}
+            onBack={() => setGamePhase('synopsis')}
             onCharacterSelect={handleCharacterSelect}
           />
         );
       case 'commonInfo':
-        return <InfoDisplayScreen title="共通情報" filePath={scenario!.commonInfo.textFile} onNext={() => setGamePhase('individualStory')} />;
+        return <InfoDisplayScreen title="ハンドアウト読み込み：共通情報" filePath={scenario!.commonInfo.textFile} onBackFlg={false} onBack={() => { }} onNext={() => setGamePhase('individualStory')} />;
       case 'individualStory': { // 波括弧でスコープを作成
         // 選択されたキャラクターIDがなければ、エラー表示または初期画面に戻す
         if (!selectedCharacterId) {
@@ -127,7 +186,7 @@ function App() {
             title="第一議論フェイズ"
             character={selectedChar!}
             tabItems={tabItems}
-            discussionTime={600} // 例: 10分
+            discussionTime={FIRST_DISCUSSION_SECONDS}
             onNext={() => setGamePhase('interlude')}
           />
         );
@@ -137,6 +196,7 @@ function App() {
           <InfoDisplayScreen
             title="中間情報"
             filePath={scenario!.intermediateInfo.textFile}
+            onBackFlg={false} onBack={() => { }}
             onNext={() => setGamePhase('secondDiscussion')} // 次は第二議論
           />
         );
@@ -160,7 +220,7 @@ function App() {
             title="第二議論フェイズ"
             character={selectedChar!}
             tabItems={tabItems}
-            discussionTime={600} // 例: 10分
+            discussionTime={SECOND_DISCUSSION_SECONDS}
             onNext={() => setGamePhase('voting')}
           />
         );
@@ -212,6 +272,22 @@ function App() {
 
   return (
     <div className="App">
+      {/* タイマーを表示すべきフェーズなら、タイマーを画面の上（や下）に表示 */}
+      {shouldShowReadingTimer && (
+        <><div style={{ position: 'fixed', top: '20px', right: '20px', zIndex: '1001' }}>
+          <Timer
+            initialSeconds={readingTime} // 現在の残り時間を渡す
+            isTicking={isReadingTimerTicking} // isTickingの状態を渡す
+            onTimeUp={dummyOnTimeUp} // 何もしない関数を渡す
+          />
+        </div><Modal
+            isOpen={isHoReadEndModalFlg}
+            message={'第一議論フェイズ画面に移動します。よろしいですか？\n読み込み時間を延長することもできます'}
+            onConfirm={() => setGamePhase('firstDiscussion')}
+            onClose={() => { setIsHoReadEndModalFlg(false); setReadingTime(READING_TIME_SECONDS_EXTENSION); setIsReadingTimerTicking(true); }}
+            confirmButtonText={"OK"}
+            closeButtonText={"延長する(3分)"} /></>
+      )}
       {/* 上記の関数を呼び出して、適切な画面を描画する */}
       {renderScreen()}
     </div>

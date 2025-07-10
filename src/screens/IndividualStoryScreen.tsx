@@ -19,7 +19,7 @@ const IndividualStoryScreen: React.FC<IndividualStoryScreenProps> = ({ character
 
   return (
     <div className="individual-story-container">
-      <h1>個別ストーリー: {character.name}</h1>
+      <h1>ハンドアウト読み込み：個別ストーリー【{character.name}】</h1>
       
       {/* メインコンテンツを左右に分割するラッパー */}
       <div className="main-content-wrapper">
@@ -68,7 +68,7 @@ const IndividualStoryScreen: React.FC<IndividualStoryScreenProps> = ({ character
           BACK
         </StyledButton>
         <StyledButton onClick={onNext}>
-          NEXT
+          第一議論フェイズへ
         </StyledButton>
       </div>
     </div>

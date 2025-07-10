@@ -21,7 +21,7 @@
   border-radius: 8px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   width: 90%;
-  max-width: 400px; /* PCでの最大幅 */
+  max-width: 450px;
   text-align: center;
 }
 
@@ -31,7 +31,7 @@
   margin-bottom: 20px;
   font-size: 1.1rem;
   line-height: 1.5;
-
+  white-space: pre-wrap;
 }
 
 /* ボタンを横に並べるためのコンテナ */
